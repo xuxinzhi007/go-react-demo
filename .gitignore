@@ -1,0 +1,75 @@
+# 通用忽略规则
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE 目录和文件
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# 日志文件
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# 临时文件
+*.tmp
+*.temp
+.cache/
+
+# 后端 Go 项目忽略规则
+# 编译生成的二进制文件
+backend/*.exe
+backend/*.out
+backend/*.app
+
+# Go 模块缓存
+go.work
+
+# Go 构建缓存
+backend/pkg/
+backend/bin/
+
+# 后端环境变量文件
+backend/.env
+backend/.env.local
+backend/.env.*.local
+
+# 前端 React 项目忽略规则
+# 依赖目录
+frontend/node_modules/
+
+# 构建输出目录
+frontend/dist/
+frontend/dist-ssr/
+*.local
+
+# 前端环境变量文件
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+
+# 测试覆盖率
+frontend/coverage/
+*.lcov
+
+# 前端构建相关
+frontend/.eslintcache
+frontend/.parcel-cache/
+frontend/.vite/
+
+# 前端编辑器配置
+frontend/.vscode/*
+!frontend/.vscode/extensions.json
+frontend/.idea/
