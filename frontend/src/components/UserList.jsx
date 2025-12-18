@@ -7,6 +7,13 @@ const UserList = () => {
   const [itemsPerPage] = useState(5);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [editFormData, setEditFormData] = useState({
+    username: '',
+    email: '',
+    is_vip: false
+  });
 
   // 获取用户数据
   const fetchUsers = async () => {
@@ -28,7 +35,7 @@ const UserList = () => {
       }
       
       const data = await response.json();
-      setUsers(data);
+      setUsers(data.data);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -57,7 +64,7 @@ const UserList = () => {
     if (window.confirm('确定要删除这个用户吗？')) {
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`http://localhost:8080/api/users/${id}`, {
+        const response = await fetch(`http://localhost:8080/api/user/${id}`, {
           method: 'DELETE',
           headers: {
             'Content-Type': 'application/json',
@@ -77,7 +84,8 @@ const UserList = () => {
     }
   };
 
-  // 处理状态切换
+  // 处理状态切换 - 暂时注释，因为后端不支持此功能
+  /*
   const toggleStatus = async (id) => {
     try {
       const token = localStorage.getItem('token');
@@ -105,11 +113,100 @@ const UserList = () => {
       setError(err.message);
     }
   };
+  */
 
   // 处理编辑用户
   const handleEdit = (id) => {
-    // 这里可以打开编辑模态框或跳转到编辑页面
-    console.log('编辑用户:', id);
+    const userToEdit = users.find(user => user.id === id);
+    if (userToEdit) {
+      setEditingUser(userToEdit);
+      setEditFormData({
+        username: userToEdit.username,
+        email: userToEdit.email,
+        is_vip: userToEdit.is_vip
+      });
+      setIsEditModalOpen(true);
+    }
+  };
+
+  // 处理编辑表单提交
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    if (!editingUser) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:8080/api/user/${editingUser.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          username: editFormData.username,
+          email: editFormData.email
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error('更新用户信息失败');
+      }
+      
+      // 更新VIP状态（如果有变化）
+      if (editFormData.is_vip !== editingUser.is_vip) {
+        const vipResponse = await fetch(`http://localhost:8080/api/user/${editingUser.id}/vip`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            is_vip: editFormData.is_vip,
+            vip_start_at: new Date().toISOString(),
+            vip_end_at: editFormData.is_vip ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() : null
+          })
+        });
+        
+        if (!vipResponse.ok) {
+          throw new Error('更新VIP状态失败');
+        }
+      }
+      
+      // 重新获取用户列表
+      fetchUsers();
+      
+      // 如果修改的是当前登录用户，更新localStorage
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        const parsedUser = JSON.parse(storedUser);
+        if (parsedUser.id === editingUser.id) {
+          // 重新获取最新的用户信息
+          const token = localStorage.getItem('token');
+          const userResponse = await fetch('http://localhost:8080/api/user/info', {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          
+          if (userResponse.ok) {
+            const userData = await userResponse.json();
+            if (userData.data && Array.isArray(userData.data)) {
+              const updatedUser = userData.data.find(u => u.id === parsedUser.id);
+              if (updatedUser) {
+                localStorage.setItem('user', JSON.stringify(updatedUser));
+              }
+            }
+          }
+        }
+      }
+      
+      setIsEditModalOpen(false);
+      alert('用户信息更新成功');
+    } catch (err) {
+      setError(err.message);
+    }
   };
 
   // 获取状态显示文本
@@ -117,9 +214,18 @@ const UserList = () => {
     return status === 'active' ? '活跃' : '禁用';
   };
 
-  // 获取角色显示文本
-  const getRoleText = (role) => {
-    return role === 'admin' ? '管理员' : '普通用户';
+  // 获取VIP状态显示文本
+  const getVipText = (isVip) => {
+    return isVip ? 'VIP用户' : '普通用户';
+  };
+
+  // 处理表单输入变化
+  const handleInputChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setEditFormData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
   };
 
   return (
@@ -174,19 +280,16 @@ const UserList = () => {
                       <td>{user.username}</td>
                       <td>{user.email}</td>
                       <td>
-                        <span className={`role-badge ${user.role === 'admin' ? 'admin' : 'user'}`}>
-                          {getRoleText(user.role)}
+                        <span className={`role-badge ${user.is_vip ? 'vip' : 'user'}`}>
+                          {getVipText(user.is_vip)}
                         </span>
                       </td>
                       <td>
-                        <button 
-                          className={`status-button ${user.status === 'active' ? 'active' : 'disabled'}`}
-                          onClick={() => toggleStatus(user.id)}
-                        >
-                          {getStatusText(user.status)}
-                        </button>
+                        <span className="user-role">
+                          {user.is_vip ? 'VIP' : '普通用户'}
+                        </span>
                       </td>
-                      <td>{new Date(user.createdAt).toLocaleDateString()}</td>
+                      <td>{new Date(user.created_at).toLocaleDateString()}</td>
                       <td className="action-buttons">
                         <button 
                           className="edit-button"
@@ -245,6 +348,65 @@ const UserList = () => {
             </div>
           )}
         </>
+      )}
+
+      {/* 编辑用户模态框 */}
+      {isEditModalOpen && (
+        <div className="modal-overlay">
+          <div className="modal-container">
+            <div className="modal-header">
+              <h2>编辑用户</h2>
+              <button 
+                className="close-button"
+                onClick={() => setIsEditModalOpen(false)}
+              >
+                ×
+              </button>
+            </div>
+            <form className="edit-form" onSubmit={handleEditSubmit}>
+              <div className="form-group">
+                <label htmlFor="username">用户名</label>
+                <input
+                  type="text"
+                  id="username"
+                  name="username"
+                  value={editFormData.username}
+                  onChange={handleInputChange}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="email">邮箱</label>
+                <input
+                  type="email"
+                  id="email"
+                  name="email"
+                  value={editFormData.email}
+                  onChange={handleInputChange}
+                  required
+                />
+              </div>
+              <div className="form-group checkbox-group">
+                <input
+                  type="checkbox"
+                  id="is_vip"
+                  name="is_vip"
+                  checked={editFormData.is_vip}
+                  onChange={handleInputChange}
+                />
+                <label htmlFor="is_vip">VIP会员</label>
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="cancel-button" onClick={() => setIsEditModalOpen(false)}>
+                  取消
+                </button>
+                <button type="submit" className="submit-button">
+                  保存
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );
